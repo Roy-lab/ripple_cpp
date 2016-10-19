@@ -1,0 +1,9 @@
+auc.jar - From http://mark.goadrich.com/programs/AUC/
+
+PR curve and AUPR calculator developed by Jesse Davis and Mark Goadrich
+See Davis & Goadrich 2006, http://mark.goadrich.com/articles/davisgoadrichcamera2.pdf
+
+Usage: java AUCCalculator java AUCCalculator <fileName> <fileType> <posCount*> <negCount*> <minRecall**>
+   posCount and negCount required if fileType ROC or PR
+   minRecall always optional
+

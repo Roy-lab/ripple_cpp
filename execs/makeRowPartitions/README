@@ -1,0 +1,31 @@
+makeRowPartitions: Generates k row-wise partitions of a data set into training and testing folds.
+
+* Assumes there are headers on the input data file.
+* Two modes: randomize the order of the examples prior to partitioning (foldsRand), or not (foldsOrdered).
+* For random mode, if the random seed is not provided as an argument, will use getpid() as the seed.
+
+
+foldsRand will randomize the row IDs and generate N exclusive training/testing folds.
+foldsOrdered will not randomize the row IDs and will also generate N exclusive training/testing folds.
+
+USAGE:
+./makeRowPartitions input_geneexp num_folds output_dir subsetsize mode [seed]
+input_geneexp: string, matrix file with headers, row names, and numeric data
+numfolds: int, number of folds/samples to generate
+output_dir: directory for output (should exist already)
+subsetsize: for rand mode, size of random sample
+mode: string, one of: rand, exclusive, foldsRand, foldsOrdered
+seed: integer, random seed
+
+modes are:
+foldsRand : randomize column IDs, then divide total rows into <numfolds> subsets and produce both training/testing files for each
+foldsOrdered : same but without randomizing row IDs
+
+
+initialized: DC 10/17/2016
+
+Example usage:
+./makeRowPartitions datafile 10 example_foldsRand_out/ foldsRand 12345
+./makeRowPartitions datafile 10 example_foldsOrdered_out/ foldsOrdered
+
+

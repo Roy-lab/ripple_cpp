@@ -1,0 +1,152 @@
+RIPPLE Random Forest
+--------------------
+
+Contact: sroy@biostat.wisc.edu
+
+Summary
+-------
+The enclosed programs can be used to reproduce the RIPPLE paper results for predicting long-range regulatory interactions.
+
+We include scripts for reproducing experiments as well as a general-use Random Forest program that you can use to run additional experiments.
+
+This document will describe the RF usage as well as the scripts that we provide for running experiments (Steps 0-4).
+
+Random Forest Usage
+-------------------
+execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir>
+
+Important options:
+mode: r (regression), c (classification)
+model_training_data: filename, contains examples and class labels
+test_data: filename, contains test examples and class labels
+ntrees: number of trees to learn
+minleafsize: RF will not split a node further if it reaches the minleafsize
+predictor_specification: a file that explains which features can be used to predict a Class feature (see data/ripple_predictor_network.txt for example) -- the RF will only use the features in the first column to predict the feature in the second column
+output_dir: directory to place results. You need to have this created before running.
+
+We recommend sending output to a file as it produces a lot of logging information.
+
+Example:
+Train on the 9th training fold for Gm12878 HiC; test on the 9th testing fold.
+
+mkdir -p results/train_Gm12878_HiC/result_cv/trees50/fold_9
+execs/randomForest/randomForest -v c -m results/train_Gm12878_HiC/traindata/trainset9.txt -d results/train_Gm12878_HiC/traindata/testset9.txt -n50 -l10 -b data/ripple_predictor_network.txt -o results/train_Gm12878_HiC/result_cv/trees50/fold_9 > run_test.log
+
+Warning: if you don't supply -b data/ripple_predictor_network.txt, or if you run with an output directory that doesn't exist yet, it will fail.
+
+--------------------------------
+Step 0: Compile C++ executables.
+--------------------------------
+Location: execs/
+	makeRowPartitions (Generates training/testing data)
+	randomForest (RandomForest implementation)
+	mergeData (used to take mean of 10 sets of predictions for a test cell line)
+	collapseTP (used to take mean of 10 sets of predictions for a test cell line)
+	auc (PR curve calculator developed by Davis & Goadrich)
+
+For every exec except auc  (which is a JAR), you will need to make the C++ for your platform.Descend into each directory and run "make" to run the makefile.
+We provide the Gnu Scientific Libraries in execs/gsl; the makefiles should be set up correctly to find them.
+
+Step 1: Generate 10-folds of training and testing data for each input dataset.
+------------------------------------------------------------------------------
+Script: make_datafolds.sh data/benchmark_datalist.txt results/
+
+This program generates 10 exclusive training/testing folds from the data files in data/.
+The file data/benchmark_datalist.txt gives the locations of each input file as well as a short name for each (K562_5C, Gm12878_HiC, etc).
+These are the possible cell types, which you can see by looking at the first column of data/benchmark_datalist.txt:
+Gm12878_5C
+H1hesc_5C
+Helas_5C
+K562_5C
+Gm12878_HiC
+K562_HiC
+
+For each "cell" in the first column of the data list file, the output will be stored in results/train_${cell}/traindata
+
+
+Step 2a: Run cross-validation experiments on each cell line/platform.
+------------------------------------------------------------
+Script: gather_predictions_crossval.sh <cellname> results/
+cellname is one of:
+Gm12878_5C
+H1hesc_5C
+Helas_5C
+K562_5C
+Gm12878_HiC
+K562_HiC
+
+This program will run 10-fold CV on the training/testing folds located in results/train_${cellname}/traindata. In serial, it will train an RF on each of the 10 training folds, and make predictions on the respective test fold.
+
+You can update the script to run with different numbers of trees, but for now we just have it set up to run on 50 trees.
+
+The output for each fold i will be stored in:
+results/train_${cellname}/result_cv/trees_50/fold_${i}
+
+You can find log/err files for each fold in 
+results/train_${cellname}/result_cv/trees_50/fold_${i}.{log/err}
+
+Step 2b: Calculate PR curves and AUPR for cross-validation.
+-----------------------------------------------------------
+Script: run_aucpr_crossval.sh <train_cell> results/
+Again, train_cell is one of:
+Gm12878_5C
+H1hesc_5C
+Helas_5C
+K562_5C
+Gm12878_HiC
+K562_HiC
+
+Given the predictions for the 10 testing folds, this program will concatenate them together into a single file and generate a PR curve and AUPR.
+You'll find the result in results/train_${train_cell}/result_cv/train_${train_cell}_trees50.{auc/.list/.pr}
+The .list file is the concatenated set of predictions for the 10 folds.
+The .auc file is the log from the AUCCalculator.
+The .pr file is the precision-recall curve produced by AUCCalculator.
+
+You can get the AUPR from the second to last line of the .auc file: tail -n 2 <auc> 
+
+Step 3a: Generate cross-line or cross-platform predictions.
+------------------------------------------------------
+Script: gather_predictions_crossline.sh data/benchmark_datalist.txt <train_cell> <test_cell> results/
+train_cell and test_cell should be different items from the list:
+Gm12878_5C
+H1hesc_5C
+Helas_5C
+K562_5C
+Gm12878_HiC
+K562_HiC
+
+This program will train an RF on each of the 10 folds of training data from the train_cell type and make predictions for ALL examples from the test_cell dataset. Eg, you may use K562_5C as train_cell and K562_HiC as test_cell.
+
+Again, we use the datalist file to tell the program where to find the examples and to set up the directory structure.
+
+For each fold i, will produce outputs in:
+results/train_${train_cell}/test_${test_cell}/trees_50/fold_${i}
+
+Again, you can find .log/.err files for each fold.
+
+Step 3b: Calculate PR curves and AUPR for cross-line or cross-platform predictions.
+------------------------------------------------------------------------
+Script: run_aucpr_crossline.sh <train_cell> results/
+train_cell is one of:
+Gm12878_5C
+H1hesc_5C
+Helas_5C
+K562_5C
+Gm12878_HiC
+K562_HiC
+
+Run this only after completing at last one cross-line/cross-platform experiment for your train_cell line. (You will need to run it after you complete all of them, but you can try it after doing one.)
+
+Given the 10 sets of predictions made for all available test_cell results by the 10 training folds of the train_cell in Step 3a, this program will (a) create an average prediction for each example (over the 10 sets) and (b) calculate the PR curve for the experiment.
+The resulting curve for some test_cell will be found in results/train_${train_cell}/test_${test_cell}/trees_50/train_${train_cell}_test_${test_cell}_trees50.{auc,list,list.pr}
+It will also generate some other files as intermediates and as by-products of the AUCCalculator.
+
+You can get the AUPR from the second to the last line of the .auc file: tail -n 2 <auc>
+You can plot a PR curve using the *list.pr file (recall, precision).
+
+Step 4: Collect AUPRs for a cell line into a file.
+--------------------------------------------------
+Script: collect_auprs.sh <train_cell> results/
+
+Assuming Steps 2b and 3b have been run, this script will extract all AUPR values from the resulting .auc files into a file for one cell line.
+It will be able to populate the file given at least one auc file, so you can try it earlier.

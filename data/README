@@ -1,0 +1,19 @@
+This directory contains all of the training data for 5C and HiC cell lines from Roy et al 2015 (RIPPLE paper).
+
+benchmark_datalist.txt 
+	Gives short names and file locations for cell-line specific training data. This will be used by the benchmarking scripts to set up experiments.
+
+ripple_predictor_network.txt
+	Important for the Random Forest running. Specifies which columns of a data file can be used to predict others. Here, we use all features to predict the Class.
+
+All other files in this directory are training datasets for each cell line:
+	5C:
+	Gm12878_enhanceronly_features.txt
+	K562_enhanceronly_features.txt
+	Helas_enhanceronly_features.txt
+	H1hesc_enhanceronly_features.txt
+
+	HiC:
+	RaoHuntley_GM12878_combined_allchr_5kb_enh_v1_examples.txt
+	RaoHuntley_K562_allchr_5kb_enh_v1_examples.txt
+

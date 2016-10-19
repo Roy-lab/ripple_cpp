@@ -1,0 +1,6 @@
+Gm12878_5C	data/Gm12878_enhanceronly_features.txt
+H1hesc_5C	data/H1hesc_enhanceronly_features.txt
+Helas_5C	data/Helas_enhanceronly_features.txt
+K562_5C	data/K562_enhanceronly_features.txt
+Gm12878_HiC	data/RaoHuntley_GM12878_combined_allchr_5kb_enh_v1_examples.txt
+K562_HiC	data/RaoHuntley_K562_allchr_5kb_enh_v1_examples.txt
