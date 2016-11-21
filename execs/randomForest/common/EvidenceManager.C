@@ -139,6 +139,7 @@ EvidenceManager::loadEvidenceFromFile_Simple(const char* inFName)
 	char* buffer=NULL;
 	int bufflen=0;
 	int lineNo=0;
+	
 	while(inFile.good())
 	{
 		getline(inFile,buffstr);
@@ -196,7 +197,13 @@ EvidenceManager::loadEvidenceFromFile_Simple(const char* inFName)
 				else
 				{
 					Evidence* evid=new Evidence;
+					// check to make sure 
 					Variable* var=vMgr->getVariableAt(tokCnt-1);
+					if (var==NULL)
+					{
+						cerr << "Row " << lineNo << " has more fields (" << tokCnt-1 << ") than expected from header row. : " << inFName << endl;
+						return Error::DATAFILE_ERR;
+					}
 					evid->assocVariable(var->getID());
 					double varVal=atof(tok);
 					evid->setEvidVal(varVal);

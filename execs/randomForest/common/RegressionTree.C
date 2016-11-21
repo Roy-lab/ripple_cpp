@@ -165,8 +165,14 @@ double
 RegressionTree::getOutputProbability(double output)
 {
 	double num=1.0*outputValues[output]; // will be 0 if no output key
+	double denum=0;
+	for (auto itr=outputValues.begin();itr!=outputValues.end();itr++)
+	{
+		denum += itr->second;
+	}
 	//cout << output << " : " << num << " / " << dataSubset.size() << endl;
-	return (num/dataSubset.size());
+	//return (num/dataSubset.size());
+	return (num/denum);
 }
 
 /*
@@ -430,7 +436,120 @@ RegressionTree::showMe(string& starter,map<int,Variable*>& varSet)
 	return 0;
 }
 
+//Deserialize the binary tree
+//Reads the node type
+//Reads the classVarID and its name (returns with an error if the names are not the same)
+//If it is a leaf:
+//	Reads regressionMode
+//	If it is in regressionMode:
+//		Reads mean and variance
+//	If it is not in regressionMode: 
+//		Reads the outputValues
+//If it is not a leaf:
+//	Reads the testVarID and its name and its value (returns with an error if the names are not the same)
+//	Does the same for its children (assumes it has 2 children)
+int
+RegressionTree::deserialize(istream& iFile, map<int,Variable*>& varSet, RegressionTree* pp)
+{
+	parent = pp;
+	int tempType;
+	iFile >> tempType;
+	nType = (NodeType)tempType;
+	string cname;
+	iFile >> classVarID >>  cname ;
+	if (cname != varSet[classVarID]->getName())
+	{
+		cerr << "ERROR: The class variable name is not the same: we read \"" << cname << "\", ";
+		cerr << "should be \"" << varSet[classVarID]->getName() << "\"" << endl;
+		return -1;
+	}
+	if (nType == LEAF)
+	{
+		iFile >> regressionMode;
+		if (regressionMode)
+		{
+			iFile >> mean >> variance;
+		}
+		else
+		{
+			int outSize;
+			iFile >> outSize;
+			outputValues.clear();
+			for (int i=0;i<outSize;i++)
+			{
+				double v;
+				int c;
+				iFile >> v >> c;
+				outputValues[v] = c;
+			}
+		}
+	}
+	else
+	{
+		string vname;
+		iFile >> testVarID >> vname >> testValue;
+		if (vname != varSet[testVarID]->getName())
+		{
+			cerr << "ERROR: The test variable name is not the same: we read \"" << vname << "\", ";
+			cerr << "should be \"" << varSet[testVarID]->getName() << "\"" << endl;
+			return -1;
+		}
+		children.clear();
+		for (int i=0;i<2;i++)
+		{
+			RegressionTree* tempChild = new RegressionTree;
+			tempChild->deserialize(iFile, varSet, this);
+			children[i] = tempChild;
+		}
+	}
+	return 0;
+}
 
+//Serialize the binary tree
+//Writes the node type
+//Writes the classVarID and its name
+//If it is a leaf:
+//	Writes regressionMode
+//	If it is in regressionMode:
+//		Writes mean and variance
+//	If it is not in regressionMode: 
+//		Writes the outputValues
+//If it is not a leaf:
+//	Writes the testVarID and its name and its value
+//	Does the same for its children (assumes it has 2 children)
+
+int
+RegressionTree::serialize(ostream& oFile, map<int,Variable*>& varSet)
+{
+	oFile << (int)nType << "\t";
+	oFile << classVarID << "\t" << varSet[classVarID]->getName()  << "\t";
+	if (nType == LEAF)
+	{
+		oFile << regressionMode << "\t";
+		if (regressionMode)
+		{
+			oFile << mean << "\t" << variance << endl;
+		}
+		else
+		{
+			oFile << outputValues.size();
+			for (auto itr=outputValues.begin(); itr!=outputValues.end(); itr++)
+			{
+				oFile << "\t" << itr->first << "\t" << itr->second;
+			}
+			oFile << endl;
+		}
+	}
+	else
+	{
+		oFile << testVarID  << "\t" << varSet[testVarID]->getName()   << "\t" << testValue << endl;
+		for(auto cIter=children.begin();cIter!=children.end();cIter++)
+		{
+			cIter->second->serialize(oFile,varSet);
+		}
+	}
+	return 0;
+}
 
 int
 RegressionTree::dumpTree(ostream& oFile,map<int,Variable*>& varSet, const char* targetName)
@@ -986,20 +1105,37 @@ RegressionTree::generateVarsTobeSampled(INTINTMAP& varSet,INTVECT& allVarSet,int
 	INTINTMAP usedInit;
 	double step=1.0/(double)size;
 	//gsl_rng* r=gsl_rng_alloc(gsl_rng_default);
-	for(int i=0;i<varCnt;i++)
+	
+	// if requested varCnt is same size as all vars, then we just use all of them
+	if (varCnt < size)
 	{
-		double rVal=gsl_ran_flat(r,0,1);
-		int rind=(int)(rVal/step);
-		while(usedInit.find(rind)!=usedInit.end())
+		for(int i=0;i<varCnt;i++)
 		{
-			rVal=gsl_ran_flat(r,0,1);
-			rind=(int)(rVal/step);
+			double rVal=gsl_ran_flat(r,0,1);
+			int rind=(int)(rVal/step);
+			while(usedInit.find(rind)!=usedInit.end())
+			{
+				rVal=gsl_ran_flat(r,0,1);
+				rind=(int)(rVal/step);
+			}
+			int vid=allVarSet[rind];
+			usedInit[rind]=0;
+			varSet[vid]=0;
 		}
-		int vid=allVarSet[rind];
-		usedInit[rind]=0;
-		varSet[vid]=0;
+	} 
+	else
+	{
+		// DC added -- if ask for all variables, then just use all of them.
+		for(int i=0;i<size;i++)
+		{
+			usedInit[i]=0;
+			varSet[i]=0;
+		}
 	}
 	usedInit.clear();
+	
+	
+	
 	return 0;
 }
 

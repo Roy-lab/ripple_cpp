@@ -34,6 +34,9 @@ FGMaximizer::FGMaximizer()
 	regressionMode=true;
 	
 	printAllTrees=false; // default: no tree printing
+	
+	// DC added: sets choice of "complete" mode (one tree, all data)
+	completeMode=false; // default: forest mode
 }
 
 FGMaximizer::~FGMaximizer()
@@ -114,6 +117,28 @@ int
 FGMaximizer::setMode(bool doRegression)
 {
 	regressionMode=doRegression;
+	return 0;
+}
+
+/*
+* Sets "complete" mode -- if true, use all data for one tree 
+* In opposition to forest mode (random data/example subsets)
+*/
+int
+FGMaximizer::setCompleteMode(bool complete)
+{
+	completeMode=complete;
+	return 0;
+}
+
+/*
+* Added by AFS
+* Sets location to read trees
+*/
+int
+FGMaximizer::setTreeLocation(const char* tl)
+{
+	strcpy(treeloc,tl);
 	return 0;
 }
 
@@ -411,6 +436,7 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 	map<int,double > varInitErr;
 	
 	char regProgFName[1024];
+	char serTreeFName[1024];
 	char netFName[1024];
 	char expFName[1024];
 	char hmFName[1024];
@@ -450,6 +476,10 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 		// set regression/classification mode
 		aPotFunc->setRegressionMode(regressionMode);
 		cout << "Running in regression mode = " << regressionMode << endl;
+		
+		// set complete data mode
+		aPotFunc->setCompleteMode(completeMode);
+		cout << "Running in complete mode = " << completeMode << endl;
 		
 		aPotFunc->setAssocVariable(sVar,Potential::FACTOR);
 		for(NINFO_MAP_ITER nIter=potentialParents.begin();nIter!=potentialParents.end();nIter++)
@@ -526,12 +556,14 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 			{
 				// regulatory program file output
 				sprintf(regProgFName,"%s/regpro_%d.txt",outputDir, t);
+				sprintf(serTreeFName,"%s/regtree_node_%d.txt",outputDir, t);
 				sprintf(netFName,"%s/regtree_network_%d.tab",outputDir, t);
 				sprintf(expFName,"%s/regtree_expression_%d.tab",outputDir, t);
 				sprintf(hmFName,"%s/regtree_expression_hmawk_%d.txt",outputDir, t);
 				sprintf(nodeFName,"%s/node_attributes_%d.txt",outputDir, t);
 	
 				ofstream oFile(regProgFName);
+				ofstream sFile(serTreeFName);
 				ofstream netFile(netFName);
 				ofstream expFile(expFName);
 				ofstream hmFile(hmFName);
@@ -541,6 +573,7 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 			
 				// dump tree to original file format
 				rtree->dumpTree(oFile,varSet,sVar->getName().c_str());
+				rtree->serialize(sFile,varSet); // Save serialized tree
 		
 				// dump tree to network file
 				map<int,int> timesSeen; // empty map
@@ -551,6 +584,7 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 				aPotFunc->dumpNodeInfo(rtree, sFactor->fId, columnNames, nodeFile);
 		
 				oFile.close(); // close tree program file
+				sFile.close(); // close serialized tree
 				netFile.close(); // close network file
 				expFile.close(); // close expression tab file
 				hmFile.close(); // close expression hmawk file
@@ -629,6 +663,108 @@ FGMaximizer::findBestGraphs_PriorGraph(double lambda,const char* projectFName)
 	
 	return 0;
 }
+
+/**
+* Reads trees from files to run prediction mode
+*/
+int
+FGMaximizer::readBestGraphs_PriorGraph(double lambda,const char* projectFName)
+{
+	//The main idea here is to take each variable and learn a regression tree using all other variables.
+	//Those variables that will not contribute significantly will not end up in the tree
+	FactorGraph* currFg=fMgr->createInitialFactorGraph();
+	double currScore=getScore(currFg);
+	cout<<"Current score: " << currScore << endl;
+	
+	VSET& varSet=vMgr->getVariableSet();
+	map<int,double > varErr;
+	map<int,double > varInitErr;
+	
+	
+	map<int,RegressionTree*> regTreeModel;
+	for(int i=0;i<currFg->getFactorCnt();i++)
+	{
+		SlimFactor* sFactor=currFg->getFactorAt(i);
+		Variable* sVar=varSet[sFactor->fId];
+		Vertex* sVertex=priorGraph.getVertex(sVar->getName().c_str());
+		cout << "Analyzing factor " << i << " " << sVar->getName() << endl;
+		if(sVertex==NULL)
+		{
+			continue;
+		}
+		NINFO_MAP& potentialParents=sVertex->getInNeighbours();
+		if(potentialParents.size()==0)
+		{
+			continue;
+		}
+		Potential* aPotFunc=new Potential;
+		// set regression/classification mode
+		aPotFunc->setRegressionMode(regressionMode);
+		cout << "Running in regression mode = " << regressionMode << endl;
+		
+		aPotFunc->setAssocVariable(sVar,Potential::FACTOR);
+		for(NINFO_MAP_ITER nIter=potentialParents.begin();nIter!=potentialParents.end();nIter++)
+		{
+			int varID=vMgr->getVarID(nIter->first.c_str());
+			if(varID==-1)
+			{
+				continue;
+			}
+			//cout << "\tPotential Parent " << varSet[varID]->getName() << " for " << sVar->getName() << endl; 
+			SlimFactor* mFactor=currFg->getFactorAt(varID);
+			if(mFactor->fId==sFactor->fId)
+			{
+				continue;
+			}
+			Variable* aVar=varSet[varID];
+			aPotFunc->setAssocVariable(aVar,Potential::MARKOV_BNKT);
+		}
+		aPotFunc->potZeroInit();
+		aPotFunc->setMinLeafSize(minLeafSize);
+		//aPotFunc->setEvidenceManager(trainEvMgr);
+
+		//aPotFunc->populateMe(lambda,treeCnt);
+		
+		// Read tree from file (AFS added)
+		aPotFunc->populateMeFromFile(treeloc,treeCnt);
+		
+		//aPotFunc->showTree();
+
+		//Do we need this?
+		//aPotFunc->calculateConditionalEntropy();
+		//sFactor->conditionalEntropy=aPotFunc->getConditionalEntropy();
+		//sFactor->jointEntropy=aPotFunc->getJointEntropy();
+		
+		
+		// Report testing error per example
+		// test data set
+		if (testEvMgr!= NULL)
+		{
+			char testerrFName[1024];
+			sprintf(testerrFName,"%s/testset_error.txt",outputDir);
+			ofstream testerrFile(testerrFName);
+			// switch on reg mode
+			if (regressionMode)
+			{
+				// Testing error
+				double testErr=aPotFunc->getTestMSE(testEvMgr, testerrFile);
+				cout << "Test Set MSE " << testErr << endl;
+			}
+			else
+			{
+				// Testing error	
+				//cout << "TESTING CLASSIFICATION ..." << endl;
+				double testErr=aPotFunc->getTestClassError(testEvMgr, testerrFile);
+				//cout << "----" << endl;
+			}
+			testerrFile.close(); // close error file 
+		}
+	}
+	
+	return 0;
+}
+
+
 
 int
 FGMaximizer::showOutput()

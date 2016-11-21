@@ -32,6 +32,7 @@ class Framework
 		char actionStr[256];
 		double penalty;
 		bool constrained;
+		bool predictionMode;
 		char projectFName[1024];
 		
 		int readColumnNames(const char*);

@@ -60,9 +60,9 @@ class RegressionTree
 	
 	typedef enum
 	{
-		ROOT,
-		NONLEAF,
-		LEAF
+		ROOT=0,
+		NONLEAF=1,
+		LEAF=2
 	}NodeType;
 	struct Pair
 	{
@@ -100,6 +100,8 @@ class RegressionTree
 	// set mode of tree for learning 
 	int setRegressionMode(bool doRegression);
 	
+	int deserialize(istream& iFile, map<int,Variable*>& varSet, RegressionTree* pp);
+	int serialize(ostream& oFile, map<int,Variable*>& varSet);
 	private:
 	int estimateMarginal();
 
@@ -139,6 +141,7 @@ class RegressionTree
 	double computeEntropyIfDeleted(Rule* r,int delMe,int&);
 
 	int orderRulesByCoverage();
+
 	RegressionTree* parent;
 	map<int,RegressionTree*> children;
 	//The set of datapoints in which the parent set configuration corresponding to the path
@@ -146,11 +149,14 @@ class RegressionTree
 	//This is for ease of computing the smaller CPTs
 	//INTINTMAP dataSubset;
 	vector<int> dataSubset;
+
 	int testVarID;
 	double testValue;
+	
 	//Need to come back and merge these two
 	INTINTMAP subtreeVarIDs;
 	INTSTRMAP subtreeVarIDNameMap;
+
 	double mean;
 	double variance;
 	double marginalEntropy;

@@ -18,7 +18,7 @@ class RegressionTree;
 
 class FGMaximizer
 {
-	public:
+public:
 	
 	FGMaximizer();
 	~FGMaximizer();
@@ -40,22 +40,30 @@ class FGMaximizer
 	int setConvergenceThreshold(double);
 	int setMinLeafSize(int);
 	int setPriorGraph(const char*);
+	
 	int findBestGraphs();
 	int findBestGraphs_TopDown(double,const char*);
 	int findBestGraphs_PriorGraph(double,const char*);
+	int readBestGraphs_PriorGraph(double,const char*);
 	int showOutput();
 	
 	// read column names from file -- DC added
 	int readColumnNames(const char*);
 	int setColumnNames(vector<string>* columnNames);
 	
-	// set running mode -- default is 1=regression.
+	// DC added - set running mode -- default is 1=regression.
 	int setMode(bool doRegression);
 	
-	// set printing mode -- default is 0=false
+	// DC added - set printing mode -- default is 0=false
 	int setPrintAllTrees(bool printTrees);
+	
+	// DC added - set "complete" mode 
+	int setCompleteMode(bool complete);
 
-	private:
+	// AFS added - read trees from this location
+	int setTreeLocation(const char*);
+
+private:
 	double getScore(FactorGraph*);
 	int sortMoves(vector<Move*>&);
 	int updateMoveOrder(int, Move*,vector<Move*>& moveSet,int&);
@@ -79,6 +87,7 @@ class FGMaximizer
 	int beamSize;
 	int minLeafSize;
 	char outputDir[1024];
+	char treeloc[1024];
 	
 	// column names - ordered by input
 	// DC added
@@ -90,10 +99,13 @@ class FGMaximizer
 	
 	int treeCnt;
 	
-	// Running mode: classification or regression
+	// DC added - Running mode: classification or regression
 	bool regressionMode; // default is 1=regression
 	
-	// Should I print the trees after learning?
+	// DC added - Should I print the trees after learning?
 	bool printAllTrees; // default is false
+	
+	// DC added - If true, use all data and learn one tree
+	bool completeMode; //default false
 };
 #endif

@@ -32,6 +32,11 @@ class Potential
 	int setEvidenceManager(EvidenceManager*);
 	int setMinLeafSize(int);
 	int populateMe(double,int);
+	
+	
+	// AFS added: read trees from files
+	int populateMeFromFile(const char*,int);
+	
 	int clearMe();
 	double getJointPotValueFor(INTINTMAP&);
 	double getJointPotValueForConf(string& varConf);
@@ -83,6 +88,7 @@ class Potential
 	
 	// DC added -- 1=run in regression mode, 0=classification
 	int setRegressionMode(bool flag);
+	int setCompleteMode(bool flat); // true: use all data per tree
 	
 	private:
 	double getMSE(RegressionTree*);
@@ -107,6 +113,7 @@ class Potential
 	
 	// DC added for classification vs regression
 	bool regressionMode; // 1=regression, 0=classification
+	bool completeMode; // Use all examples/features, just one tree
 	
 };
 #endif
