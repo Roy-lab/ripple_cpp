@@ -1,32 +1,41 @@
-RIPPLE Random Forest
---------------------
+How to reproduce RIPPLE experiments
+and train/test a Random Forest 
+----------------------------------
 
-Contact: sroy@biostat.wisc.edu
+Contact: chasman@wisc.edu, sroy@biostat.wisc.edu
 
 Summary
 -------
 The enclosed programs can be used to reproduce the RIPPLE paper results for predicting long-range regulatory interactions.
 
-We include scripts for reproducing experiments as well as a general-use Random Forest program that you can use to run additional experiments.
+We include scripts for reproducing experiments, as well as a general-use Random Forest program that you can use to run more experiments.
 
-This document will describe the RF usage as well as the scripts that we provide for running experiments (Steps 0-4).
+This document will describe how to reproduce the experiments we report in the RIPPLE paper. It will also show how to use the Random Forest by itself. 
 
-Random Forest Usage
--------------------
+The steps to generate the results reported in the paper are:
+0) Compile C++ execs
+1) Generate 10-folds of training and testing data for each input dataset (script provided)
+2a) For each cell line/platform, run cross-validation experiments on each cell line/platform. This entails training a Random Forest on one training fold and testing on its complementary testing fold. (Script provided)
+2b) Calculate PR curves and AUPR for the cross-validation results from each cell line. (Script provided)
+3a) For each pair of cell lines/platforms, train on one cell line and predict on the other. This entails learning 10 Random Forests for the training cell line (one for each training fold) and making a set of 10 predictions for each example in the testing cell line. (Script provided)
+3b) Calculate PR curves and AUPR for cross-line and cross-platform predictions. For one example, we take the average prediction across the 10 folds. (script provided)
+4) Collect all AUPRs for a cell line into a file. (script provided)
+
+-------------------------------------------
+How to train and test with a Random Forest
+-------------------------------------------
 Before running, create an ouput directory:
 mkdir <output_dir>
 
 To train an RF and test it on another dataset:
-execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir>
+execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir> 
 
-
-To train an RF and write out trees for later usage, supply the "-i t" option. Files with prefix "regtree_node_" will be written to the output directory.
-execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees> -l<minLeafSize> -b<predictor_specification> -o <output_dir> -i t
+To train an RF and write out trained trees for later usage, supply the "-i t" option. Files with prefix "regtree_node_" will be written to the output directory.
+execs/randomForest/randomForest -v <mode> -m <model_training_data> -n<ntrees> -l<minLeafSize> -b<predictor_specification> -o <output_dir> [-i<printAllTrees>]
 
 To test a pre-trained RF on a new dataset, we need to provide the prefix for those files:
 execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir> -s <trained_prefix>
 where <trained_prefix> will usually be "<train_output_dir>/regtree_node" (unless you renamed them)
-
 
 Important options:
 mode: r (regression), c (classification)
@@ -36,11 +45,11 @@ ntrees: number of trees to learn
 minleafsize: RF will not split a node further if it reaches the minleafsize
 predictor_specification: a file that explains which features can be used to predict a Class feature (see data/ripple_predictor_network.txt for example) -- the RF will only use the features in the first column to predict the feature in the second column
 output_dir: directory to place results. You need to have this created before running.
-
+printAllTrees: If "t" provided, will print every tree to a human-readable file in the output directory. Will also write trees for loading in to test later.  (Optional, by default off.)
 
 We recommend sending output to a file as it produces a lot of logging information.
 
-Example:
+Example (see also the gather_predictions*sh scripts)
 Train on the 9th training fold for Gm12878 HiC; test on the 9th testing fold.
 
 mkdir -p results/train_Gm12878_HiC/result_cv/trees50/fold_9
@@ -61,6 +70,7 @@ Location: execs/
 For every exec except auc  (which is a JAR), you will need to make the C++ for your platform.Descend into each directory and run "make" to run the makefile.
 We provide the Gnu Scientific Libraries in execs/gsl; the makefiles should be set up correctly to find them.
 
+-----------------------------------------------------------------------------
 Step 1: Generate 10-folds of training and testing data for each input dataset.
 ------------------------------------------------------------------------------
 Script: make_datafolds.sh data/benchmark_datalist.txt results/
@@ -118,8 +128,9 @@ The .pr file is the precision-recall curve produced by AUCCalculator.
 
 You can get the AUPR from the second to last line of the .auc file: tail -n 2 <auc> 
 
+----------------------------------------------------------
 Step 3a: Generate cross-line or cross-platform predictions.
-------------------------------------------------------
+----------------------------------------------------------
 Script: gather_predictions_crossline.sh data/benchmark_datalist.txt <train_cell> <test_cell> results/
 train_cell and test_cell should be different items from the list:
 Gm12878_5C
@@ -138,6 +149,7 @@ results/train_${train_cell}/test_${test_cell}/trees_50/fold_${i}
 
 Again, you can find .log/.err files for each fold.
 
+------------------------------------------------------------------------
 Step 3b: Calculate PR curves and AUPR for cross-line or cross-platform predictions.
 ------------------------------------------------------------------------
 Script: run_aucpr_crossline.sh <train_cell> results/
@@ -158,6 +170,7 @@ It will also generate some other files as intermediates and as by-products of th
 You can get the AUPR from the second to the last line of the .auc file: tail -n 2 <auc>
 You can plot a PR curve using the *list.pr file (recall, precision).
 
+--------------------------------------------------
 Step 4: Collect AUPRs for a cell line into a file.
 --------------------------------------------------
 Script: collect_auprs.sh <train_cell> results/
