@@ -1,7 +1,7 @@
 #!/bin/bash
 # Gather predictions cross-cell-line for ONE test cell
 # starting with one training cell line, testing on ONE other
-# USAGE: gather_predictions_crossline datalist train_cellline test_cellline esults_top
+# USAGE: gather_predictions_crossline datalist train_cellline test_cellline results_top
 
 if [ $# != 4 ]; then
 	echo "USAGE: gather_predictions_crossline datalist train_cell test_cell results_top"

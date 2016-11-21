@@ -13,7 +13,20 @@ This document will describe the RF usage as well as the scripts that we provide 
 
 Random Forest Usage
 -------------------
+Before running, create an ouput directory:
+mkdir <output_dir>
+
+To train an RF and test it on another dataset:
 execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir>
+
+
+To train an RF and write out trees for later usage, supply the "-i t" option. Files with prefix "regtree_node_" will be written to the output directory.
+execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees> -l<minLeafSize> -b<predictor_specification> -o <output_dir> -i t
+
+To test a pre-trained RF on a new dataset, we need to provide the prefix for those files:
+execs/randomForest/randomForest -v <mode> -m <model_training_data> -d <test_data> -n<ntrees>  -l<minLeafSize> -b<predictor_specification> -o <output_dir> -s <trained_prefix>
+where <trained_prefix> will usually be "<train_output_dir>/regtree_node" (unless you renamed them)
+
 
 Important options:
 mode: r (regression), c (classification)
@@ -23,6 +36,7 @@ ntrees: number of trees to learn
 minleafsize: RF will not split a node further if it reaches the minleafsize
 predictor_specification: a file that explains which features can be used to predict a Class feature (see data/ripple_predictor_network.txt for example) -- the RF will only use the features in the first column to predict the feature in the second column
 output_dir: directory to place results. You need to have this created before running.
+
 
 We recommend sending output to a file as it produces a lot of logging information.
 

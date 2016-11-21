@@ -21,6 +21,7 @@ Potential::Potential()
 	r=gsl_rng_alloc(gsl_rng_default);
 	gcnt=0;
 	regressionMode=true; // by default, do regression
+	completeMode=false; // by default, assume forest mode (bootstrap samples)
 }
 
 Potential::~Potential()
@@ -49,6 +50,17 @@ int
 Potential::setRegressionMode(bool doRegression)
 {
 	regressionMode=doRegression;
+	return 0;
+}
+
+/*
+ * Sets whether to learn one tree from all data (true) 
+ * or run in Forest mode (false)
+ */
+int
+Potential::setCompleteMode(bool doComplete)
+{
+	completeMode=doComplete;
 	return 0;
 }
 
@@ -136,9 +148,27 @@ Potential::getJointEntropy()
 	return jointEntropy;
 }
 
+int
+Potential::populateMeFromFile(const char* inPrefix,int treeCnt)
+{
+	dtreeSet.clear();
+	for (int i=0;i<treeCnt;i++)
+	{
+		RegressionTree* t = new RegressionTree;
+		char inname[1024];
+		sprintf(inname,"%s_%d.txt",inPrefix,i);
+		ifstream iFile(inname);
+		t->deserialize(iFile,varSet,NULL);
+		iFile.close();
+		dtreeSet.push_back(t);
+	}
+	return 0;
+}
+
 //To turn this code into a forest, we will create multiple trees and let them work with different  datasets. In addition, instead of searching over all variables, we would randomly sub-sample a set of features (supposed to be a third) and split on that.
 // For Regression, we sub-sample 1/3 features.
 // For Classification, we sub-sample sqrt() number of features.
+// However, if in Complete mode, we just use all of the data and all features.
 int
 Potential::populateMe(double regval,int treeCnt)
 {
@@ -162,12 +192,27 @@ Potential::populateMe(double regval,int treeCnt)
 		
 		
 		//Each tree now needs to maintain its own cache and leafset
-		generateSamplesForTree_Bootstrap(dataSamples);			
+		if (completeMode) // DC added - just use all data
+		{
+			// use all data
+			cout << "Using all data for this tree" << endl;
+			for (int i=0;evMgr->getNumberOfEvidences();i++)
+			{
+				dataSamples.push_back(i);
+			}
+		}
+		else // bootstrap samples
+		{
+			generateSamplesForTree_Bootstrap(dataSamples);			
+		}
+		
+		// set up the data
 		for(int i=0;i<dataSamples.size();i++)
 		{
 			dtree->setDataID(dataSamples[i]);
 		}
 		dataSamples.clear();	
+		
 		for(INTINTMAP_ITER mbIter=markovBlnktVariables.begin();mbIter!=markovBlnktVariables.end();mbIter++)
 		{
 			//dtree->setSubtreeVariable(mbIter->first);
@@ -187,7 +232,7 @@ Potential::populateMe(double regval,int treeCnt)
 		struct timeval endtime2;
 		gettimeofday(&begintime2,NULL);
 		
-		// Affected by classification
+		// Affected by classification and complete mode (DC)
 		dtree->learn(lambda,minLeafSize,randvarCnt);
 		gettimeofday(&endtime2,NULL);
 		cout << "Time to learn  tree " << t << " " << endtime2.tv_sec-begintime2.tv_sec<< " seconds and " << endtime2.tv_usec-begintime2.tv_usec << " micro secs" << endl;
@@ -386,6 +431,7 @@ Potential::generateSamplesForTree_Bootstrap(vector<int>& dataSamples)
 	dist.clear();
 	return 0;
 }
+
 
 
 int
