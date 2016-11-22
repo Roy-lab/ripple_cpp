@@ -1,3 +1,5 @@
+RIPPLE is a software tool to predict enhancer-promoter interactions. RIPPLE is based random forests classification that trains a binary classifier for interactions inferred from Hi-C or 5C data. 
+
 How to reproduce RIPPLE experiments
 and train/test a Random Forest 
 ----------------------------------
