@@ -196,7 +196,7 @@ Potential::populateMe(double regval,int treeCnt)
 		{
 			// use all data
 			cout << "Using all data for this tree" << endl;
-			for (int i=0;evMgr->getNumberOfEvidences();i++)
+			for (int i=0;i<evMgr->getNumberOfEvidences();i++)
 			{
 				dataSamples.push_back(i);
 			}
