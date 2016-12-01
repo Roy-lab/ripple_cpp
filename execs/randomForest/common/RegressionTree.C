@@ -1129,7 +1129,8 @@ RegressionTree::generateVarsTobeSampled(INTINTMAP& varSet,INTVECT& allVarSet,int
 		for(int i=0;i<size;i++)
 		{
 			usedInit[i]=0;
-			varSet[i]=0;
+			int vid=allVarSet[i];
+			varSet[vid]=0;
 		}
 	}
 	usedInit.clear();
